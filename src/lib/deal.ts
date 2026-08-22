@@ -383,3 +383,381 @@ export function analyze(t: TermSheet): Analysis {
     flags,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Status model, term-by-term assessment, counteroffer and exit calculator
+// ---------------------------------------------------------------------------
+
+export type Status = "fair" | "negotiate" | "unfavourable" | "high-risk";
+
+export const STATUS_META: Record<Status, { label: string; icon: string }> = {
+  fair: { label: "Fair / acceptable", icon: "🟢" },
+  negotiate: { label: "Negotiate", icon: "🟡" },
+  unfavourable: { label: "Unfavourable", icon: "🔴" },
+  "high-risk": { label: "High risk", icon: "🚨" },
+};
+
+export type TermRow = {
+  id: string;
+  term: string;
+  offer: string;
+  benchmark: string;
+  status: Status;
+  why: string;
+  recommended: string;
+};
+
+export function overallStatus(score: number): Status {
+  if (score >= 80) return "fair";
+  if (score >= 60) return "negotiate";
+  if (score >= 40) return "unfavourable";
+  return "high-risk";
+}
+
+export function isRedFlag(s: Status): boolean {
+  return s === "unfavourable" || s === "high-risk";
+}
+
+function liqPrefLabel(t: TermSheet): string {
+  return LIQ_PREF_OPTIONS.find((o) => o.value === t.liquidationPreference)!.label;
+}
+
+/** Nine-term assessment derived from the same rules used by `analyze`. */
+export function termRows(t: TermSheet, a: Analysis): TermRow[] {
+  const rows: TermRow[] = [];
+
+  // 1. Ticket size
+  rows.push({
+    id: "ticket",
+    term: "Ticket size",
+    offer: formatCHF(t.ticketSize),
+    benchmark: `Covers the funding requirement of ${formatCHF(t.fundingRequirement)}`,
+    status:
+      a.fundingGap <= 0 ? "fair" : a.fundingCoverage < 60 ? "unfavourable" : "negotiate",
+    why:
+      a.fundingGap > 0
+        ? `Ticket covers only ${formatPct(a.fundingCoverage, 0)} of the plan — a ${formatCHF(a.fundingGap)} gap remains.`
+        : "The ticket fully funds the stated requirement.",
+    recommended:
+      a.fundingGap > 0
+        ? `Raise the ticket to ${formatCHF(t.fundingRequirement)} or add a co-investor for ${formatCHF(a.fundingGap)}.`
+        : "Accept as proposed.",
+  });
+
+  // 2. Pre-money valuation
+  const preLow = 3_000_000;
+  const preHigh = 6_000_000;
+  const preStatus: Status =
+    t.preMoney >= preLow ? "fair" : t.preMoney >= preLow * 0.75 ? "negotiate" : "unfavourable";
+  rows.push({
+    id: "premoney",
+    term: "Pre-money valuation",
+    offer: formatCHF(t.preMoney),
+    benchmark: "CHF 3m – 6m (seed fair zone)",
+    status: preStatus,
+    why:
+      preStatus === "fair"
+        ? "Inside the seed fair zone, so the price of the round is defensible."
+        : `Below the fair zone — every franc of the ticket costs more equity than it should.`,
+    recommended:
+      preStatus === "fair"
+        ? "Hold the proposed valuation."
+        : `Counter at ${formatCHF(preLow)}–${formatCHF(preHigh)} pre-money.`,
+  });
+
+  // 3. Post-money valuation
+  rows.push({
+    id: "postmoney",
+    term: "Post-money valuation",
+    offer: formatCHF(a.postMoney),
+    benchmark: "Pre-money + ticket size",
+    status: preStatus === "fair" ? "fair" : "negotiate",
+    why: `${formatCHF(t.preMoney)} pre-money plus a ${formatCHF(t.ticketSize)} ticket sets the price for every share issued in this round.`,
+    recommended: `A ${formatCHF(preLow)} pre-money floor puts post-money at ${formatCHF(preLow + t.ticketSize)} or better.`,
+  });
+
+  // 4. Investor equity
+  const eqStatus: Status =
+    t.investorEquity > 30
+      ? "high-risk"
+      : t.investorEquity > 25
+        ? "unfavourable"
+        : t.investorEquity > 22
+          ? "negotiate"
+          : "fair";
+  rows.push({
+    id: "equity",
+    term: "Investor equity",
+    offer: formatPct(t.investorEquity),
+    benchmark: "15% – 22% at seed",
+    status: eqStatus,
+    why:
+      eqStatus === "fair"
+        ? `Inside the fair zone; the valuation implies ${formatPct(a.impliedInvestorEquity)}.`
+        : `Above the seed norm of 15–22%${a.equityDelta > 0.5 ? `, and ${formatPct(a.equityDelta)} more than the ${formatPct(a.impliedInvestorEquity)} the valuation implies` : ""}. Founders fall to ${formatPct(a.founderAfter)}.`,
+    recommended:
+      eqStatus === "fair"
+        ? "Accept as proposed."
+        : `Counter at 20% — that is ${formatPct(t.investorEquity - 20)} of the cap table back to founders.`,
+  });
+
+  // 5. Liquidation preference
+  const liqStatus: Status =
+    a.prefMultiple >= 2 && a.participating
+      ? "high-risk"
+      : a.participating || a.prefMultiple >= 2
+        ? "unfavourable"
+        : "fair";
+  rows.push({
+    id: "liqpref",
+    term: "Liquidation preference",
+    offer: liqPrefLabel(t),
+    benchmark: "1x non-participating",
+    status: liqStatus,
+    why:
+      liqStatus === "fair"
+        ? "Investor takes the greater of their money back or their pro-rata share — no double dip."
+        : `Investor takes ${formatCHF(a.prefMultiple * t.ticketSize)} off the top${a.participating ? " and then still shares pro-rata in the rest" : ""}, before founders see anything.`,
+    recommended: liqStatus === "fair" ? "Accept as proposed." : "1x non-participating.",
+  });
+
+  // 6. Vesting
+  const vestStatus: Status =
+    t.vestingYears > 4 && t.cliffYears > 1
+      ? "unfavourable"
+      : t.vestingYears > 4 || t.cliffYears > 1 || t.vestingYears < 3
+        ? "negotiate"
+        : "fair";
+  rows.push({
+    id: "vesting",
+    term: "Vesting",
+    offer: `${t.vestingYears} years / ${t.cliffYears}-year cliff`,
+    benchmark: "4 years / 1-year cliff",
+    status: vestStatus,
+    why:
+      vestStatus === "fair"
+        ? "Standard founder vesting."
+        : `Founders stay unvested longer than market${t.cliffYears > 1 ? ` and forfeit everything if they leave inside ${t.cliffYears} years` : ""}.`,
+    recommended:
+      vestStatus === "fair"
+        ? "Accept, but add double-trigger acceleration on a change of control."
+        : "4 years with a 1-year cliff, plus credit for time already served.",
+  });
+
+  // 7. Board / veto
+  const seats = t.investorBoardSeat ? Math.max(1, Math.round(t.investorBoardSeats)) : 0;
+  const vetoLabel = VETO_OPTIONS.find((o) => o.value === t.vetoRights)!.label;
+  const boardStatus: Status =
+    t.vetoRights === "day-to-day"
+      ? "high-risk"
+      : t.vetoRights === "broad" || seats >= 2
+        ? "unfavourable"
+        : "fair";
+  rows.push({
+    id: "board",
+    term: "Board seat / veto rights",
+    offer: `${seats === 0 ? "No board seat" : `${seats} board seat${seats > 1 ? "s" : ""}`} · veto: ${vetoLabel}`,
+    benchmark: "One investor seat · veto limited to major decisions",
+    status: boardStatus,
+    why:
+      boardStatus === "fair"
+        ? "Founders keep board control and the investor only blocks major decisions."
+        : `${seats >= 2 ? "Multiple seats for one seed investor concede board influence. " : ""}${t.vetoRights === "broad" ? "Broad veto rights let the investor block ordinary strategic moves such as hiring, budget or a pivot." : t.vetoRights === "day-to-day" ? "Veto over day-to-day operations makes the investor a shadow CEO." : ""}`,
+    recommended:
+      boardStatus === "fair"
+        ? "Accept as proposed."
+        : "One investor seat and a closed list of reserved matters (new shares, sale, debt, changes to share rights).",
+  });
+
+  // 8. Anti-dilution
+  const adStatus: Status =
+    t.antiDilution === "full-ratchet"
+      ? "high-risk"
+      : t.antiDilution === "other"
+        ? "negotiate"
+        : "fair";
+  rows.push({
+    id: "antidilution",
+    term: "Anti-dilution",
+    offer: ANTI_DILUTION_OPTIONS.find((o) => o.value === t.antiDilution)!.label,
+    benchmark: "Broad-based weighted average",
+    status: adStatus,
+    why:
+      adStatus === "fair"
+        ? "Shares the pain of a down round fairly between investor and founders."
+        : t.antiDilution === "full-ratchet"
+          ? "Full ratchet re-prices the investor's entire stake to the lowest future price — one small down round can wipe out a large share of founder equity."
+          : "Non-standard wording; the down-round outcome is unpredictable.",
+    recommended: adStatus === "fair" ? "Accept as proposed." : "Broad-based weighted average.",
+  });
+
+  // 9. Tranches
+  const tranches = Math.max(1, Math.round(t.tranches));
+  const trancheStatus: Status = tranches >= 3 ? "unfavourable" : tranches === 2 ? "negotiate" : "fair";
+  rows.push({
+    id: "tranches",
+    term: "Tranches / milestones",
+    offer: `${tranches} tranche${tranches > 1 ? "s" : ""} · ${formatCHF(a.firstTranche)} at closing`,
+    benchmark: "Max 2–3 with realistic, controllable milestones",
+    status: trancheStatus,
+    why:
+      tranches === 1
+        ? "Full amount lands at closing — no milestone risk on the capital."
+        : `Only ${formatCHF(a.firstTranche)} of ${formatCHF(t.ticketSize)} is committed today; the investor keeps the option to walk while founders carry the execution risk.`,
+    recommended:
+      trancheStatus === "fair"
+        ? "Accept as proposed."
+        : "Maximum two tranches, objective founder-controllable milestones, and full equity from closing.",
+  });
+
+  return rows;
+}
+
+export type CounterRow = { term: string; offer: string; counter: string; effect?: string };
+
+export function counteroffer(t: TermSheet, a: Analysis): CounterRow[] {
+  const rows: CounterRow[] = [];
+  const targetPre = Math.max(3_000_000, Math.min(6_000_000, t.preMoney));
+  const targetEquity = Math.min(22, Math.max(15, t.investorEquity > 22 ? 20 : t.investorEquity));
+
+  rows.push({
+    term: "Pre-money valuation",
+    offer: formatCHF(t.preMoney),
+    counter: t.preMoney < 3_000_000 ? `${formatCHF(3_000_000)} – ${formatCHF(6_000_000)}` : formatCHF(targetPre),
+    effect:
+      t.preMoney < 3_000_000
+        ? `At ${formatCHF(3_000_000)} pre-money the same ticket buys ${formatPct((t.ticketSize / (3_000_000 + t.ticketSize)) * 100)} instead of ${formatPct(a.impliedInvestorEquity)}.`
+        : "Inside the fair zone.",
+  });
+  rows.push({
+    term: "Investor equity",
+    offer: formatPct(t.investorEquity),
+    counter: `${formatPct(targetEquity, 0)} (fair zone 15–22%)`,
+    effect:
+      t.investorEquity > targetEquity
+        ? `Returns ${formatPct(t.investorEquity - targetEquity)} of the cap table to founders — worth ${formatCHF(((t.investorEquity - targetEquity) / 100) * Math.max(0, t.exitValue))} at the modelled exit.`
+        : "Already within the fair zone.",
+  });
+  rows.push({
+    term: "Liquidation preference",
+    offer: liqPrefLabel(t),
+    counter: "1x non-participating",
+    effect:
+      a.prefMultiple > 1 || a.participating
+        ? `Frees up ${formatCHF(Math.max(0, a.investorExitProceeds - Math.max(t.ticketSize, Math.max(0, t.exitValue) * (t.investorEquity / 100))))} of exit proceeds for the common shareholders.`
+        : "Already market standard.",
+  });
+  rows.push({
+    term: "Vesting",
+    offer: `${t.vestingYears} years / ${t.cliffYears}-year cliff`,
+    counter: "4 years / 1-year cliff",
+    effect:
+      t.vestingYears > 4 || t.cliffYears > 1
+        ? `Founders fully vest ${Math.max(0, t.vestingYears - 4)} year(s) earlier and de-risk the cliff.`
+        : "Already market standard.",
+  });
+  rows.push({
+    term: "Board",
+    offer: t.investorBoardSeat
+      ? `${Math.max(1, Math.round(t.investorBoardSeats))} investor seat(s)`
+      : "No investor seat",
+    counter: "One investor seat",
+    effect:
+      t.investorBoardSeat && Math.round(t.investorBoardSeats) > 1
+        ? "Keeps the founder majority on the board."
+        : "Already market standard.",
+  });
+  rows.push({
+    term: "Veto rights",
+    offer: VETO_OPTIONS.find((o) => o.value === t.vetoRights)!.label,
+    counter: "Limited to major decisions",
+    effect:
+      t.vetoRights === "broad" || t.vetoRights === "day-to-day"
+        ? "Restores founder control over hiring, budget and strategy."
+        : "Already market standard.",
+  });
+  rows.push({
+    term: "Anti-dilution",
+    offer: ANTI_DILUTION_OPTIONS.find((o) => o.value === t.antiDilution)!.label,
+    counter: "Broad-based weighted average",
+    effect:
+      t.antiDilution === "full-ratchet"
+        ? "Caps founder dilution in a down round instead of re-pricing the whole investor stake."
+        : "Already market standard.",
+  });
+  const tranches = Math.max(1, Math.round(t.tranches));
+  rows.push({
+    term: "Tranches",
+    offer: `${tranches} tranche${tranches > 1 ? "s" : ""}`,
+    counter: tranches >= 3 ? "Maximum 2, controllable milestones" : "2–3 with realistic milestones",
+    effect:
+      tranches >= 3
+        ? `Moves ${formatCHF(t.ticketSize / 2 - a.firstTranche)} of capital forward to closing.`
+        : "Acceptable if the milestones are founder-controllable.",
+  });
+
+  return rows;
+}
+
+export type ExitBreakdown = {
+  exitValue: number;
+  investment: number;
+  investorEquityPct: number;
+  prefLabel: string;
+  prefEntitlement: number;
+  prefPayment: number;
+  remaining: number;
+  participationPayment: number;
+  investorTotal: number;
+  commonTotal: number;
+  founderShare: number;
+  otherShare: number;
+  investorPctOfExit: number;
+  commonPctOfExit: number;
+  tookPreference: boolean;
+};
+
+export function exitBreakdown(t: TermSheet, a: Analysis): ExitBreakdown | null {
+  const exit = Math.max(0, t.exitValue);
+  if (!exit) return null;
+
+  const investorPct = t.investorEquity / 100;
+  const prefEntitlement = a.prefMultiple * t.ticketSize;
+  let prefPayment: number;
+  let participationPayment: number;
+  let tookPreference: boolean;
+
+  if (a.participating) {
+    prefPayment = Math.min(exit, prefEntitlement);
+    participationPayment = Math.max(0, exit - prefPayment) * investorPct;
+    tookPreference = true;
+  } else {
+    const asConverted = exit * investorPct;
+    tookPreference = Math.min(exit, prefEntitlement) >= asConverted;
+    prefPayment = tookPreference ? Math.min(exit, prefEntitlement) : 0;
+    participationPayment = tookPreference ? 0 : asConverted;
+  }
+
+  const investorTotal = Math.min(exit, prefPayment + participationPayment);
+  const commonTotal = Math.max(0, exit - investorTotal);
+  const nonInvestorPct = Math.max(0.0001, 1 - investorPct);
+  const founderShare = commonTotal * ((t.founderOwnership / 100) / nonInvestorPct);
+
+  return {
+    exitValue: exit,
+    investment: t.ticketSize,
+    investorEquityPct: t.investorEquity,
+    prefLabel: liqPrefLabel(t),
+    prefEntitlement,
+    prefPayment,
+    remaining: Math.max(0, exit - prefPayment),
+    participationPayment,
+    investorTotal,
+    commonTotal,
+    founderShare: Math.min(commonTotal, founderShare),
+    otherShare: Math.max(0, commonTotal - Math.min(commonTotal, founderShare)),
+    investorPctOfExit: (investorTotal / exit) * 100,
+    commonPctOfExit: (commonTotal / exit) * 100,
+    tookPreference,
+  };
+}
