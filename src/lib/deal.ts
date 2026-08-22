@@ -494,7 +494,7 @@ export function termRows(t: TermSheet, a: Analysis): TermRow[] {
     why:
       eqStatus === "fair"
         ? `Inside the fair zone; the valuation implies ${formatPct(a.impliedInvestorEquity)}.`
-        : `Above the seed norm. The valuation only implies ${formatPct(a.impliedInvestorEquity)}, so ${formatPct(Math.max(0, a.equityDelta))} is an unpriced giveaway, and founders fall to ${formatPct(a.founderAfter)}.`,
+        : `Above the seed norm of 15–22%${a.equityDelta > 0.5 ? `, and ${formatPct(a.equityDelta)} more than the ${formatPct(a.impliedInvestorEquity)} the valuation implies` : ""}. Founders fall to ${formatPct(a.founderAfter)}.`,
     recommended:
       eqStatus === "fair"
         ? "Accept as proposed."
