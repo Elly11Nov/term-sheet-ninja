@@ -107,6 +107,43 @@ export function formatPct(value: number, digits = 1): string {
   return `${value.toFixed(digits)}%`;
 }
 
+export type MilestoneAssessment = {
+  severity: "good" | "watch" | "risk";
+  worst: string;
+  uncontrollable: string[];
+  demanding: string[];
+};
+
+const OUTSIDE_CONTROL = [
+  "econom", "gdp", "bip", "inflation", "interest rate", "market grows", "market growth",
+  "stock market", "index", "regulat", "approval by", "authorit", "competitor", "third party",
+  "follow-on investor", "another investor", "co-investor", "acquisition offer", "ipo",
+  "pandemic", "war", "exchange rate", "currency", "grant awarded", "tender",
+];
+
+const DEMANDING = [
+  "arr", "mrr", "revenue", "umsatz", "profitab", "break-even", "breakeven", "ebitda",
+  "customers", "users", "subscribers", "bookings", "sales of",
+];
+
+export function assessMilestones(milestones: string[], count: number): MilestoneAssessment {
+  const list = milestones.slice(0, Math.max(0, count)).map((m) => (m ?? "").trim()).filter(Boolean);
+  const uncontrollable: string[] = [];
+  const demanding: string[] = [];
+  for (const m of list) {
+    const text = m.toLowerCase();
+    if (OUTSIDE_CONTROL.some((k) => text.includes(k))) uncontrollable.push(m);
+    else if (DEMANDING.some((k) => text.includes(k))) demanding.push(m);
+  }
+  const severity = uncontrollable.length ? "risk" : demanding.length ? "watch" : "good";
+  return {
+    severity,
+    worst: uncontrollable[0] ?? demanding[0] ?? list[0] ?? "",
+    uncontrollable,
+    demanding,
+  };
+}
+
 export function analyze(t: TermSheet): Analysis {
   const postMoney = t.preMoney + t.ticketSize;
   const impliedInvestorEquity = postMoney > 0 ? (t.ticketSize / postMoney) * 100 : 0;
