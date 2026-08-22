@@ -762,16 +762,25 @@ export function counteroffer(t: TermSheet, a: Analysis): CounterRow[] {
         ? "Caps founder dilution in a down round instead of re-pricing the whole investor stake."
         : "Already market standard.",
   });
-  const tranches = Math.max(1, Math.round(t.tranches));
+  const tranches = Math.max(0, Math.round(t.tranches));
+  const ms = assessMilestones(t.milestones, tranches);
   rows.push({
     term: "Tranches",
-    offer: `${tranches} tranche${tranches > 1 ? "s" : ""}`,
-    counter: tranches >= 3 ? "Maximum 2, controllable milestones" : "2–3 with realistic milestones",
+    offer: `${tranches === 0 ? "No tranches" : `${tranches} tranche${tranches > 1 ? "s" : ""}`}`,
+    counter:
+      ms.severity === "risk"
+        ? "Remove macro/3rd-party milestones; max 3 founder-controllable milestones"
+        : tranches > 3
+          ? "Maximum 3 realistic, founder-controllable milestones"
+          : "Up to 3 realistic, founder-controllable milestones",
     effect:
-      tranches >= 3
-        ? `Moves ${formatCHF(t.ticketSize / 2 - a.firstTranche)} of capital forward to closing.`
-        : "Acceptable if the milestones are founder-controllable.",
+      ms.severity === "risk"
+        ? "Removes release conditions founders cannot satisfy."
+        : tranches > 3
+          ? `Moves ${formatCHF(t.ticketSize / 3 - a.firstTranche)} of capital forward to closing.`
+          : "Acceptable if the milestones are founder-controllable.",
   });
+
 
   return rows;
 }
