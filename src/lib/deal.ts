@@ -486,7 +486,9 @@ function liqPrefLabel(t: TermSheet): string {
 
 /** Nine-term assessment derived from the same rules used by `analyze`. */
 export function termRows(t: TermSheet, a: Analysis): TermRow[] {
+  const tranches = Math.max(0, Math.round(t.tranches));
   const rows: TermRow[] = [];
+
 
   // 1. Ticket size
   rows.push({
