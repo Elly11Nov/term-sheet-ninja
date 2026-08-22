@@ -107,6 +107,43 @@ export function formatPct(value: number, digits = 1): string {
   return `${value.toFixed(digits)}%`;
 }
 
+export type MilestoneAssessment = {
+  severity: "good" | "watch" | "risk";
+  worst: string;
+  uncontrollable: string[];
+  demanding: string[];
+};
+
+const OUTSIDE_CONTROL = [
+  "econom", "gdp", "bip", "inflation", "interest rate", "market grows", "market growth",
+  "stock market", "index", "regulat", "approval by", "authorit", "competitor", "third party",
+  "follow-on investor", "another investor", "co-investor", "acquisition offer", "ipo",
+  "pandemic", "war", "exchange rate", "currency", "grant awarded", "tender",
+];
+
+const DEMANDING = [
+  "arr", "mrr", "revenue", "umsatz", "profitab", "break-even", "breakeven", "ebitda",
+  "customers", "users", "subscribers", "bookings", "sales of",
+];
+
+export function assessMilestones(milestones: string[], count: number): MilestoneAssessment {
+  const list = milestones.slice(0, Math.max(0, count)).map((m) => (m ?? "").trim()).filter(Boolean);
+  const uncontrollable: string[] = [];
+  const demanding: string[] = [];
+  for (const m of list) {
+    const text = m.toLowerCase();
+    if (OUTSIDE_CONTROL.some((k) => text.includes(k))) uncontrollable.push(m);
+    else if (DEMANDING.some((k) => text.includes(k))) demanding.push(m);
+  }
+  const severity = uncontrollable.length ? "risk" : demanding.length ? "watch" : "good";
+  return {
+    severity,
+    worst: uncontrollable[0] ?? demanding[0] ?? list[0] ?? "",
+    uncontrollable,
+    demanding,
+  };
+}
+
 export function analyze(t: TermSheet): Analysis {
   const postMoney = t.preMoney + t.ticketSize;
   const impliedInvestorEquity = postMoney > 0 ? (t.ticketSize / postMoney) * 100 : 0;
@@ -326,25 +363,50 @@ export function analyze(t: TermSheet): Analysis {
     detail: adDetail[t.antiDilution],
   });
 
-  // Tranches
-  if (tranches > 1) {
+  // Tranches — the count alone is not a red flag; the milestones decide.
+  const ms = assessMilestones(t.milestones, tranches);
+  if (t.tranches <= 0) {
     push({
       id: "tranches",
       area: "Tranches",
-      severity: tranches >= 3 ? "risk" : "watch",
-      headline: `${tranches} tranches — only ${formatCHF(firstTranche)} is committed today`,
+      severity: "good",
+      headline: "No tranches — full amount at closing",
+      detail: "No milestone risk on the capital.",
+    });
+  } else if (ms.severity === "risk") {
+    push({
+      id: "tranches",
+      area: "Tranches",
+      severity: "risk",
+      headline: `Milestone outside founder control: “${ms.worst}”`,
       detail:
-        "Milestone tranches shift execution risk onto the founders while the investor keeps the option to walk. Insist on objective, founder-controllable milestones and full ownership of the equity from closing.",
+        "A tranche may only depend on milestones the founders can actually influence. Market, macro-economic or third-party conditions must be removed or replaced by objective, founder-controllable targets, with full equity from closing.",
+    });
+  } else if (ms.severity === "watch" || tranches > 3) {
+    push({
+      id: "tranches",
+      area: "Tranches",
+      severity: "watch",
+      headline:
+        tranches > 3
+          ? `${tranches} tranches — more than the customary maximum of three`
+          : `Milestone looks demanding: “${ms.worst}”`,
+      detail:
+        tranches > 3
+          ? `Only ${formatCHF(firstTranche)} is committed today. Consolidate into at most three tranches with realistic, founder-controllable milestones.`
+          : "The milestone may be ambitious for the timeframe. Stress-test the plan and, if in doubt, soften the target or extend the deadline before signing.",
     });
   } else {
     push({
       id: "tranches",
       area: "Tranches",
       severity: "good",
-      headline: "Single tranche — full amount at closing",
-      detail: "No milestone risk on the capital.",
+      headline: `${tranches} tranche${tranches > 1 ? "s" : ""} with founder-controllable milestones`,
+      detail:
+        "Up to three tranches are acceptable as long as the milestones stay realistic and within the founders' control.",
     });
   }
+
 
   const weights: Record<"good" | "watch" | "risk", number> = { good: 0, watch: 1, risk: 1 };
   const riskPoints = flags.reduce(
