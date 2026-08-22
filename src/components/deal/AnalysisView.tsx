@@ -37,14 +37,26 @@ function SeverityDot({ severity }: { severity: "good" | "watch" | "risk" }) {
   return <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${cls}`} />;
 }
 
-function Bar({ label, value, total, tone }: { label: string; value: number; total: number; tone: string }) {
+function Bar({
+  label,
+  value,
+  total,
+  tone,
+  unit = "chf",
+}: {
+  label: string;
+  value: number;
+  total: number;
+  tone: string;
+  unit?: "chf" | "pct";
+}) {
   const pct = total > 0 ? (value / total) * 100 : 0;
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
         <span className="numeric font-medium text-foreground">
-          {formatCHF(value, true)} · {formatPct(pct, 0)}
+          {unit === "chf" ? `${formatCHF(value, true)} · ${formatPct(pct, 0)}` : formatPct(value)}
         </span>
       </div>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
@@ -125,13 +137,14 @@ export function AnalysisView({ terms, onBack }: { terms: TermSheet; onBack: () =
           <section className="panel p-6">
             <p className="label-caps">Cap table after the round</p>
             <div className="mt-4 space-y-4">
-              <Bar label="Investor" value={terms.investorEquity} total={100} tone="bg-accent" />
-              <Bar label="Founders" value={a.founderAfter} total={100} tone="bg-primary" />
+              <Bar label="Investor" value={terms.investorEquity} total={100} tone="bg-accent" unit="pct" />
+              <Bar label="Founders" value={a.founderAfter} total={100} tone="bg-primary" unit="pct" />
               <Bar
                 label="Others / option pool"
                 value={Math.max(0, 100 - terms.investorEquity - a.founderAfter)}
                 total={100}
                 tone="bg-muted-foreground"
+                unit="pct"
               />
             </div>
           </section>
