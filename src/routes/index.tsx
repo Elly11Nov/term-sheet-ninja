@@ -54,20 +54,24 @@ function Index() {
           </div>
 
           <nav className="flex rounded-lg border border-border bg-surface p-1">
-            {(["input", "analysis"] as const).map((v) => (
+            {([
+              { id: "input", label: "1 · Input offer" },
+              { id: "analysis", label: "2 · Analysis" },
+            ] as const).map((v) => (
               <button
-                key={v}
-                onClick={() => setView(v)}
+                key={v.id}
+                onClick={() => setView(v.id)}
                 className={`flex-1 rounded-md px-4 py-1.5 text-xs font-semibold tracking-widest uppercase transition-colors sm:flex-none ${
-                  view === v
-                    ? "bg-secondary text-foreground"
+                  view === v.id
+                    ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {v}
+                {v.label}
               </button>
             ))}
           </nav>
+
         </div>
       </header>
 
