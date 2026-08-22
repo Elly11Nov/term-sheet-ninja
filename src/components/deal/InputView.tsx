@@ -27,7 +27,8 @@ type Props = {
 };
 
 export function InputView({ terms, onChange, onAnalyze, postMoney, impliedEquity }: Props) {
-  const trancheCount = Math.min(3, Math.max(1, Math.round(terms.tranches)));
+  const trancheCount = Math.max(0, Math.min(6, Math.round(terms.tranches)));
+
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
