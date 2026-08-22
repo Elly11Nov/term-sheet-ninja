@@ -80,10 +80,14 @@ function Index() {
           <InputView
             terms={terms}
             onChange={update}
-            onAnalyze={() => setView("analysis")}
+            onAnalyze={() => {
+              setView("analysis");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             postMoney={postMoney}
             impliedEquity={impliedEquity}
           />
+
         ) : (
           <AnalysisView terms={terms} onBack={() => setView("input")} />
         )}
