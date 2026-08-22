@@ -153,8 +153,9 @@ export function analyze(t: TermSheet): Analysis {
   const fundingGap = t.fundingRequirement - t.ticketSize;
   const fundingCoverage =
     t.fundingRequirement > 0 ? (t.ticketSize / t.fundingRequirement) * 100 : 100;
-  const tranches = Math.max(1, Math.round(t.tranches));
-  const firstTranche = t.ticketSize / tranches;
+  const tranches = Math.max(0, Math.round(t.tranches));
+  const firstTranche = tranches > 0 ? t.ticketSize / tranches : t.ticketSize;
+
 
   const prefMultiple = t.liquidationPreference.startsWith("2x") ? 2 : 1;
   const participating = t.liquidationPreference.endsWith("participating") &&
@@ -486,7 +487,9 @@ function liqPrefLabel(t: TermSheet): string {
 
 /** Nine-term assessment derived from the same rules used by `analyze`. */
 export function termRows(t: TermSheet, a: Analysis): TermRow[] {
+  const tranches = Math.max(0, Math.round(t.tranches));
   const rows: TermRow[] = [];
+
 
   // 1. Ticket size
   rows.push({
@@ -654,23 +657,35 @@ export function termRows(t: TermSheet, a: Analysis): TermRow[] {
   });
 
   // 9. Tranches
-  const tranches = Math.max(1, Math.round(t.tranches));
-  const trancheStatus: Status = tranches >= 3 ? "unfavourable" : tranches === 2 ? "negotiate" : "fair";
+  const ms = assessMilestones(t.milestones, tranches);
+  const trancheStatus: Status =
+    ms.severity === "risk"
+      ? "unfavourable"
+      : tranches > 3
+        ? "negotiate"
+        : tranches >= 1 && tranches <= 3
+          ? "fair"
+          : "fair";
   rows.push({
     id: "tranches",
     term: "Tranches / milestones",
-    offer: `${tranches} tranche${tranches > 1 ? "s" : ""} · ${formatCHF(a.firstTranche)} at closing`,
-    benchmark: "Max 2–3 with realistic, controllable milestones",
+    offer: `${tranches === 0 ? "No tranches" : `${tranches} tranche${tranches > 1 ? "s" : ""} · ${formatCHF(a.firstTranche)} at closing`}`,
+    benchmark: "Max 3 with realistic, founder-controllable milestones",
     status: trancheStatus,
     why:
-      tranches === 1
+      tranches === 0
         ? "Full amount lands at closing — no milestone risk on the capital."
-        : `Only ${formatCHF(a.firstTranche)} of ${formatCHF(t.ticketSize)} is committed today; the investor keeps the option to walk while founders carry the execution risk.`,
+        : ms.severity === "risk"
+          ? `Milestone outside founder control: “${ms.worst}”. This is not a valid release condition. Remove or replace it with an objective, founder-controllable target.`
+          : ms.severity === "watch"
+            ? `Looks demanding: “${ms.worst}”. Stress-test the timeline and confirm it is realistically achievable.`
+            : `Up to 3 tranches are acceptable as long as milestones are realistic and founder-controllable.`,
     recommended:
       trancheStatus === "fair"
-        ? "Accept as proposed."
-        : "Maximum two tranches, objective founder-controllable milestones, and full equity from closing.",
+        ? "Accept as proposed (if milestones are controllable)."
+        : "Maximum 3 tranches, objective founder-controllable milestones, and full equity from closing.",
   });
+
 
   return rows;
 }
@@ -747,16 +762,25 @@ export function counteroffer(t: TermSheet, a: Analysis): CounterRow[] {
         ? "Caps founder dilution in a down round instead of re-pricing the whole investor stake."
         : "Already market standard.",
   });
-  const tranches = Math.max(1, Math.round(t.tranches));
+  const tranches = Math.max(0, Math.round(t.tranches));
+  const ms = assessMilestones(t.milestones, tranches);
   rows.push({
     term: "Tranches",
-    offer: `${tranches} tranche${tranches > 1 ? "s" : ""}`,
-    counter: tranches >= 3 ? "Maximum 2, controllable milestones" : "2–3 with realistic milestones",
+    offer: `${tranches === 0 ? "No tranches" : `${tranches} tranche${tranches > 1 ? "s" : ""}`}`,
+    counter:
+      ms.severity === "risk"
+        ? "Remove macro/3rd-party milestones; max 3 founder-controllable milestones"
+        : tranches > 3
+          ? "Maximum 3 realistic, founder-controllable milestones"
+          : "Up to 3 realistic, founder-controllable milestones",
     effect:
-      tranches >= 3
-        ? `Moves ${formatCHF(t.ticketSize / 2 - a.firstTranche)} of capital forward to closing.`
-        : "Acceptable if the milestones are founder-controllable.",
+      ms.severity === "risk"
+        ? "Removes release conditions founders cannot satisfy."
+        : tranches > 3
+          ? `Moves ${formatCHF(t.ticketSize / 3 - a.firstTranche)} of capital forward to closing.`
+          : "Acceptable if the milestones are founder-controllable.",
   });
+
 
   return rows;
 }
