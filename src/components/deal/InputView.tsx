@@ -194,12 +194,13 @@ export function InputView({ terms, onChange, onAnalyze, postMoney, impliedEquity
           <Field label="Number of tranches" full>
             <NumberField
               value={terms.tranches}
-              onChange={(v) => onChange("tranches", Math.min(3, Math.max(1, v)))}
+              onChange={(v) => onChange("tranches", Math.min(6, Math.max(0, v)))}
               step={1}
-              min={1}
+              min={0}
             />
           </Field>
-          {Array.from({ length: trancheCount }).map((_, i) => (
+          {trancheCount > 0 && Array.from({ length: trancheCount }).map((_, i) => (
+
             <Field key={i} label={`Tranche ${i + 1} milestone`} full>
               <Input
                 value={terms.milestones[i] ?? ""}
