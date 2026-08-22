@@ -153,8 +153,9 @@ export function analyze(t: TermSheet): Analysis {
   const fundingGap = t.fundingRequirement - t.ticketSize;
   const fundingCoverage =
     t.fundingRequirement > 0 ? (t.ticketSize / t.fundingRequirement) * 100 : 100;
-  const tranches = Math.max(1, Math.round(t.tranches));
-  const firstTranche = t.ticketSize / tranches;
+  const tranches = Math.max(0, Math.round(t.tranches));
+  const firstTranche = tranches > 0 ? t.ticketSize / tranches : t.ticketSize;
+
 
   const prefMultiple = t.liquidationPreference.startsWith("2x") ? 2 : 1;
   const participating = t.liquidationPreference.endsWith("participating") &&
