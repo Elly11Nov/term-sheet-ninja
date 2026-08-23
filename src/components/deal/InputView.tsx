@@ -223,7 +223,11 @@ export function InputView({ terms, onChange, onAnalyze, postMoney, impliedEquity
           title="Optional exit scenario"
           description="Used to model the liquidation waterfall."
         >
-          <Field label="Expected company exit value" full>
+          <Field
+            label="Expected company exit value"
+            full
+            hint="Estimated future sale value of the company. This is an assumption used to calculate the investor and founder returns at exit; it is not derived automatically from the pre-money valuation or other initial deal parameters."
+          >
             <NumberField
               value={terms.exitValue}
               onChange={(v) => onChange("exitValue", v)}
