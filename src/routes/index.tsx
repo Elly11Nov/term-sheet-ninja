@@ -39,6 +39,7 @@ function Index() {
       return next;
     });
   };
+  const postMoney = terms.preMoney + terms.ticketSize;
   const impliedEquity = useMemo(
     () => (postMoney > 0 ? (terms.ticketSize / postMoney) * 100 : 0),
     [postMoney, terms.ticketSize],
