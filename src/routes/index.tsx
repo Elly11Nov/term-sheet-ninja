@@ -28,9 +28,17 @@ function Index() {
   const [terms, setTerms] = useState<TermSheet>(defaultTermSheet);
   const [view, setView] = useState<"input" | "analysis">("input");
 
-  const update = <K extends keyof TermSheet>(key: K, value: TermSheet[K]) =>
-    setTerms((prev) => ({ ...prev, [key]: value }));
-
+  const update = <K extends keyof TermSheet>(key: K, value: TermSheet[K]) => {
+    setTerms((prev) => {
+      const next = { ...prev, [key]: value } as TermSheet;
+      if (key === "investorEquity") {
+        const equity = Math.max(0, Math.min(100, value as number));
+        next.investorEquity = equity;
+        next.founderOwnership = Math.max(0, 100 - equity);
+      }
+      return next;
+    });
+  };
   const postMoney = terms.preMoney + terms.ticketSize;
   const impliedEquity = useMemo(
     () => (postMoney > 0 ? (terms.ticketSize / postMoney) * 100 : 0),

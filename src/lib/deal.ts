@@ -31,7 +31,7 @@ export const defaultTermSheet: TermSheet = {
   fundingRequirement: 2_500_000,
   preMoney: 6_000_000,
   investorEquity: 22,
-  founderOwnership: 70,
+  founderOwnership: 78,
   liquidationPreference: "1x-non-participating",
   vestingYears: 4,
   cliffYears: 1,

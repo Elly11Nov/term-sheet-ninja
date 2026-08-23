@@ -77,13 +77,15 @@ export function InputView({ terms, onChange, onAnalyze, postMoney, impliedEquity
               step={0.5}
             />
           </Field>
-          <Field label="Founder ownership (pre-round)">
-            <NumberField
-              value={terms.founderOwnership}
-              onChange={(v) => onChange("founderOwnership", v)}
-              suffix="%"
-              step={1}
-            />
+          <Field label="Founder ownership (pre-round)" hint="Calculated as 100% − investor equity">
+            <div className="relative">
+              <div className="numeric flex h-11 items-center rounded-md border border-input bg-surface-2/60 px-3 text-base text-muted-foreground">
+                <span className="mr-1">{formatPct(100 - terms.investorEquity)}</span>
+              </div>
+              <span className="numeric pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                %
+              </span>
+            </div>
           </Field>
         </Section>
 
@@ -221,7 +223,11 @@ export function InputView({ terms, onChange, onAnalyze, postMoney, impliedEquity
           title="Optional exit scenario"
           description="Used to model the liquidation waterfall."
         >
-          <Field label="Expected company exit value" full>
+          <Field
+            label="Expected company exit value"
+            full
+            hint="Estimated future sale value of the company. This is an assumption used to calculate the investor and founder returns at exit; it is not derived automatically from the pre-money valuation or other initial deal parameters."
+          >
             <NumberField
               value={terms.exitValue}
               onChange={(v) => onChange("exitValue", v)}
