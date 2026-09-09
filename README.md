@@ -1,27 +1,40 @@
 # Deal Compass
-Term Sheet Negotiator
+# Deal Compass
+
+## AI-Assisted Term Sheet Negotiator
 
 An AI-assisted prototype designed to help startup founders assess key terms in a proposed seed investment.
 
-The application translates a complex term sheet into a structured deal assessment, covering investment, ownership, liquidation preference, vesting, board control, anti-dilution provisions and funding requirements.
-Key capabilities
+Deal Compass translates a complex term sheet into a structured deal assessment, helping founders understand the financial and governance implications of an investment proposal before entering negotiations.
 
-Calculates post-money valuation and implied investor ownership
-Identifies the funding gap
-Models founder ownership after investment
-Captures liquidation preference, vesting and control provisions
-Supports tranche and milestone scenarios
-Provides an optional exit-value scenario
+## Key capabilities
 
-My role
+* Calculates post-money valuation and implied investor ownership
+* Identifies the funding gap between the company's requirements and the proposed investment
+* Models founder ownership after investment
+* Captures liquidation preference, vesting and board/control provisions
+* Supports different anti-dilution structures
+* Models tranche and milestone scenarios
+* Provides an optional exit-value scenario
 
-Product concept, requirements definition, information architecture, UX/content design and AI-assisted application development.
+## My role
 
-Technology
+Product concept, requirements definition, information architecture, UX/content design, financial logic definition and AI-assisted application development.
 
-Built with Lovable using a modern web application stack. The prototype uses local state and does not currently require authentication, a database or external APIs.
+## Technology
 
-Live prototype
+Built with Lovable using a modern web application stack.
 
-[View Term Sheet Negotiator]
+The prototype uses local application state and does not currently require authentication, a database or external APIs.
 
+## Why I built it
+
+Early-stage investment term sheets contain financial and governance provisions that can be difficult to assess as a whole.
+
+This prototype explores how structured requirements, financial modelling and AI-assisted application development can turn complex investment terms into a clearer decision-support experience.
+
+**Note:** This is a prototype for exploration and does not provide legal, financial or investment advice.
+
+## Live prototype
+
+**[View Deal Compass](https://term-sheet-ninja.lovable.app)**
