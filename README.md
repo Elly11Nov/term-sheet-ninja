@@ -22,9 +22,17 @@ Product concept, requirements definition, information architecture, UX/content d
 
 ## Technology
 
-Built with Lovable using a modern web application stack.
-
 The prototype uses local application state and does not currently require authentication, a database or external APIs.
+React 19
+TypeScript
+TanStack Start and TanStack Router
+Vite
+Tailwind CSS
+React Hook Form
+Zod
+Recharts
+Radix UI
+Lovable for AI-assisted application development
 
 ## Why I built it
 
