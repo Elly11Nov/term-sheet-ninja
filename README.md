@@ -1,5 +1,4 @@
 # Deal Compass
-# Deal Compass
 
 ## AI-Assisted Term Sheet Negotiator
 
