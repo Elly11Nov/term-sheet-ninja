@@ -101,4 +101,50 @@ I defined and designed:
 * UX and content structure
 * Financial logic
 * Scenario logic
-* Decision-sup
+* Decision-support workflow
+* AI-assisted application development
+
+The project demonstrates the intersection of **requirements engineering, information architecture, structured data, financial modelling and AI-assisted product development**.
+
+## Architecture
+
+The prototype currently uses local application state and does not require authentication, a database or external APIs.
+
+The architecture separates the presentation layer from the underlying deal logic, allowing future integration with external data or AI services.
+
+Potential future integrations include:
+
+* AI-assisted term extraction
+* Automated term-sheet classification
+* Deal comparison
+* Negotiation-point identification
+* Scenario generation
+* External financial or company data
+
+## Technology
+
+* React 19
+* TypeScript
+* TanStack Start
+* TanStack Router
+* Vite
+* Tailwind CSS
+* React Hook Form
+* Zod
+* Recharts
+* Radix UI
+* Lovable for AI-assisted application development
+
+## Why I built it
+
+The project explores how complex business and financial requirements can be transformed into a structured model and a usable decision-support tool.
+
+It also demonstrates how AI-assisted development can be combined with **requirements engineering, information architecture and domain modelling** rather than treated simply as code generation.
+
+## Disclaimer
+
+Deal Compass is a prototype for exploration and educational purposes. It does not provide legal, financial or investment advice. Users should consult qualified professional advisers before making investment or financing decisions.
+
+## Live prototype
+
+**[View Deal Compass](https://term-sheet-ninja.lovable.app)**
